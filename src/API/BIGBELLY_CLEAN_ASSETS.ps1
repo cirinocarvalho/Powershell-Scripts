@@ -31,6 +31,10 @@ Function JsonData {
    
     Begin {
         Log-Write -LogPath $sLogFile -LineValue ("Start Get-JsonData From BigBelly API")
+        #Set Windows Proxy
+        $Wcl = new-object System.Net.WebClient
+        $Wcl.Headers.Add("user-agent", "PowerShell Script")
+        $Wcl.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials
     }
     
     Process {
