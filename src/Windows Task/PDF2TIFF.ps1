@@ -1,7 +1,7 @@
 <###
 Created by: Cirino Carvalho
 Date: 06/19/2019
-Purpose: Create one tiff from pdf with 2 pages
+Purpose: Create one tiff from pdf
 ###>
 
 #---------------------------------------------------------[Initialisations]--------------------------------------------------------------
@@ -11,10 +11,13 @@ $ErrorActionPreference = "SilentlyContinue"
 #-----------------------------------------------------------[Declarations]----------------------------------------------------------------
 
 #Script Version
-$sScriptVersion = "1.0"
+$sScriptVersion = "1.1"
+
+#Get-PSDrive B | Remove-PSDrive
+#New-PSDrive –Name "B" –PSProvider FileSystem –Root "\\file\folder\"
 
 #MasterFolder
-$pathMaster = "C:\!Tools\ghostscript"
+$pathMaster = "C:\!Tools\ghostscript\"
 #Ghostscript path exe
 $tool = 'C:\Program Files\gs\gs9.27\bin\gswin64c.exe'
 
@@ -22,7 +25,7 @@ $tool = 'C:\Program Files\gs\gs9.27\bin\gswin64c.exe'
 [bool]$vertical = 0
 
 #Source of pdf's to be converted
-$pdfSource = "$pathMaster\"
+$pdfSource = "$pathMaster"
 
 #Dest of pdf's processed
 $pdfDest = "$pathMaster\pdf\"
@@ -32,7 +35,7 @@ If(!(test-path $pdfDest))
 }
 
 #Source of tiff's converted from pdf's
-$tiffSource = "$pathMaster\"
+$tiffSource = $pdfSource
 
 #Dest of tiff's after appeding
 $tiffDest = "$pathMaster\tiff\"
@@ -64,58 +67,124 @@ Function AppendTiff {
     
     Process {
         Try {
-            $firstPath = ($tiffSource + $filename + "1.tif")
-            $secondPath = ($tiffSource + $filename + "2.tif")
-    
-            if ((test-path $firstPath) -and (test-path $secondPath)) {
-                [System.Drawing.Image]$firstImage = [System.Drawing.Image]::FromFile($firstPath)
-                [System.Drawing.Image]$secondImage = [System.Drawing.Image]::FromFile($secondPath)
-    
-                [int] $outputImageWidth
-                [int] $outputImageHeight
-    
-                If ($vertical) {
-                    $outputImageWidth = If ($firstImage.Width -gt $secondImage.Width) { $firstImage.Width } Else { $secondImage.Width }
-                    $outputImageHeight = $firstImage.Height + $secondImage.Height
-                }
-                Else {
-                    $outputImageWidth = $firstImage.Width + $secondImage.Width
-                    $outputImageHeight = If ($firstImage.Height -gt $secondImage.Height) { $firstImage.Height } Else { $secondImage.Height }
-                }
-        
-                [System.Drawing.Bitmap] $outputImage = New-Object System.Drawing.Bitmap -Args $outputImageWidth, $outputImageHeight, Format24bppRgb
-                [System.Drawing.Graphics] $graphics = $null
-        
-                $graphics = [System.Drawing.Graphics]::FromImage($outputImage)
-    
-                If ($vertical) {
-                    $graphics.DrawImage($firstImage, (New-Object System.Drawing.Rectangle -Args (New-Object System.Drawing.Point), $firstImage.Size), (New-Object System.Drawing.Rectangle -Args (New-Object System.Drawing.Point), $firstImage.Size), "Pixel")
-                    $graphics.DrawImage($secondImage, (New-Object System.Drawing.Rectangle -Args (New-Object System.Drawing.Point -Args 0, $firstImage.Height), $secondImage.Size), (New-Object System.Drawing.Rectangle -Args (New-Object System.Drawing.Point), $secondImage.Size), "Pixel")
-                }
-                Else {
-                    $graphics.DrawImage($firstImage, (New-Object System.Drawing.Rectangle -Args (New-Object System.Drawing.Point), $firstImage.Size), (New-Object System.Drawing.Rectangle -Args (New-Object System.Drawing.Point), $firstImage.Size), "Pixel")
-                    $graphics.DrawImage($secondImage, (New-Object System.Drawing.Rectangle -Args (New-Object System.Drawing.Point -Args $firstImage.Width, 0), $secondImage.Size), (New-Object System.Drawing.Rectangle -Args (New-Object System.Drawing.Point), $secondImage.Size), "Pixel")
-                }
-            
-                #Write the new image file
-                $outputImage.Save("$tiffDest\$filename.tif", "tiff")
+                $filepath = ($tiffSource + $filename + "*.tif")
 
-                $firstImage.Dispose()
-                $secondImage.Dispose()
+                $files = Get-ChildItem $filepath
 
-                #Delete the tiffs temp file
-                Remove-Item -Path $firstPath -Force
-                Remove-Item -Path $secondPath -Force
-            
-                #Move the pdf to another folder
-                Move-Item -Path ($pdfSource + $filename + ".pdf") -Destination ($pdfDest + $filename + ".pdf") -Force
+                If ($files.Count -gt 0)
+                {
+                    foreach ($file in $files) 
+                    {
+
+                        $Index = If ($files.Count -gt 1) {($files.IndexOf($file)+1)} Else { 1 }
+                        
+                        [System.Drawing.Image]$imageTemp = [System.Drawing.Image]::FromFile($file.Fullname)
+                        New-Variable -Name "image${Index}" -Value $imageTemp -Force
+
+                    }
+
+                    [int] $outputImageWidth = 0
+                    [int] $outputImageHeight = 0
+
+                
+                    If ($vertical)
+                    {
+                        for ($i=1; $i -le $files.Count; $i++)
+                            {
+
+                               $temp = Get-Variable -Name "image$i" -ValueOnly
+                               $outputImageWidth = If ($outputImageWidth.Width -gt $temp.Width) { $outputImageWidth.Width } Else { $temp.Width }
+                               $outputImageHeight += $temp.Height
+                            }
+                    }
+                    Else
+                    {
+                        for ($i=1; $i -le $files.Count; $i++)
+                            {
+
+                               $temp = Get-Variable -Name "image$i" -ValueOnly
+                               $outputImageWidth += $temp.Width
+                               $outputImageHeight =  If ($outputImageWidth.Height -gt $temp.Height) { $outputImageWidth.Height } Else { $temp.Height }
+                            }
+                    }
+
+                    [System.Drawing.Bitmap] $outputImage = New-Object System.Drawing.Bitmap -Args $outputImageWidth, $outputImageHeight, Format24bppRgb
+                    [System.Drawing.Graphics] $graphics = $null
+
+                    $graphics = [System.Drawing.Graphics]::FromImage($outputImage)
+
+                    If ($vertical)
+                    {
+                        $graphics.DrawImage($image1, (New-Object System.Drawing.Rectangle -Args (New-Object System.Drawing.Point), $image1.Size), (New-Object System.Drawing.Rectangle -Args (New-Object System.Drawing.Point), $image1.Size), "Pixel")
+                        $size = 0
+
+                        If($files.Count -gt 1)
+                        {
+                            for ($i=2; $i -le $files.Count; $i++)
+                                {
+                                    $j = $i - 1
+                                    $size += (Get-Variable -Name "image$j" -ValueOnly).Height
+                                    $graphics.DrawImage((Get-Variable -Name "image$i" -ValueOnly), (New-Object System.Drawing.Rectangle -Args (New-Object System.Drawing.Point -Args 0, $size), (Get-Variable -Name "image$i" -ValueOnly).Size), (New-Object System.Drawing.Rectangle -Args (New-Object System.Drawing.Point), (Get-Variable -Name "image$i" -ValueOnly).Size), "Pixel")
+
+                                }
+                        }
     
-                Log-Write -LogPath $sLogFile -LineValue ("Finishing Appending the files..." + $filename)
+                    }
+                    Else
+                    {
+                        $graphics.DrawImage($image1, (New-Object System.Drawing.Rectangle -Args (New-Object System.Drawing.Point), $image1.Size), (New-Object System.Drawing.Rectangle -Args (New-Object System.Drawing.Point), $image1.Size), "Pixel")
+                        $size = 0
 
-                $graphics.Dispose()
+                        If($files.Count -gt 1)
+                        {
+                            for ($i=2; $i -le $files.Count; $i++)
+                                {
+                                    $j = $i - 1
+                                    $size += (Get-Variable -Name "image$j" -ValueOnly).Width
+                                    $graphics.DrawImage((Get-Variable -Name "image$i" -ValueOnly), (New-Object System.Drawing.Rectangle -Args (New-Object System.Drawing.Point -Args $size, 0), (Get-Variable -Name "image$i" -ValueOnly).Size), (New-Object System.Drawing.Rectangle -Args (New-Object System.Drawing.Point), (Get-Variable -Name "image$i" -ValueOnly).Size), "Pixel")
 
-            }
-            else {
+                                }
+                        }
+                    }
+
+                    #Write the new image file
+                    $lastFile = "$tiffDest\$filename.tif"
+                    
+                    If(test-path $lastFile)
+                    {
+                        Remove-Item -Path $lastFile -Force
+                    }
+
+                    $outputImage.Save($lastFile, "tiff")
+
+                    $temp.Dispose()
+                    $imageTemp.Dispose()
+
+                    for ($i=1; $i -le $files.Count; $i++)
+                        {
+
+                           (Get-Variable -Name "image$i" -ValueOnly).Dispose()
+
+                        }
+
+                    #Delete the tiffs temp file
+                    foreach ($file in $files) {
+ 
+                        Remove-Item -Path $file.FullName -Force
+
+                    } 
+
+                    #Move the pdf to another folder
+                    Move-Item -Path ($pdfSource + $filename + ".pdf") -Destination ($pdfDest + $filename + ".pdf") -Force
+    
+                    Log-Write -LogPath $sLogFile -LineValue ("Finishing Appending the files..." + $filename)
+
+                    $graphics.Dispose()
+                
+                }
+                
+
+            Else {
                 Log-Write -LogPath $sLogFile -LineValue ("Temp tiff file not exist!")
             }
         }
@@ -148,16 +217,27 @@ Function ConvertPDF2Tiff {
             $pdfs = get-childitem $pdfSource | Where-Object { $_.Extension -match "pdf" }
             If ($pdfs.Count -gt 0) {
                 foreach ($pdf in $pdfs) {
-      
+     
                     $tiff = $pdf.FullName.split('.')[0] + '%01d' + '.tif'
+                    
                     if (test-path $tiff) {
                         Log-Write -LogPath $sLogFile -LineValue ("tiff file already exists " + $tiff)
                     }
                     else { 
+
+                        Write-Output($pdf.FullName)
                         Log-Write -LogPath $sLogFile -LineValue ('Start Convert the file ' + $pdf.Name)         
                         $param = "-sOutputFile=$tiff"
-                        & $tool -q -dNOPAUSE -sDEVICE=tiff24nc -sCompression=lzw $param -r200  $pdf.FullName -c quit
+                        & $tool -q `
+                        -dNOPAUSE `
+                        -sDEVICE=tiff24nc `
+                        -sCompression=lzw $param `
+                        -r200  `
+                        $pdf.FullName `
+                        -c quit `
+
                         Log-Write -LogPath $sLogFile -LineValue ('File Converted Sucessfull ' + $pdf.Name)  
+
                         AppendTiff($pdf.Name.split('.')[0])
                     }
                 }
