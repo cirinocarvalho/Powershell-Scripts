@@ -1,0 +1,6 @@
+# Build and test output
+out/
+
+# Runtime logs from example scripts
+logs/
+*.log
