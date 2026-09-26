@@ -1,6 +1,6 @@
-# Powershell-Scripts
+# OpenDataSync
 
-[![CI](https://github.com/cirinocarvalho/Powershell-Scripts/actions/workflows/ci.yml/badge.svg)](https://github.com/cirinocarvalho/Powershell-Scripts/actions/workflows/ci.yml)
+[![CI](https://github.com/cirinocarvalho/OpenDataSync/actions/workflows/ci.yml/badge.svg)](https://github.com/cirinocarvalho/OpenDataSync/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![PowerShell](https://img.shields.io/badge/PowerShell-7.2%2B-5391FE?logo=powershell&logoColor=white)](https://learn.microsoft.com/powershell/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-success)](#requirements)
@@ -29,8 +29,8 @@ rebuilt the way it should be shipped.
 ## Quick start
 
 ```powershell
-git clone https://github.com/cirinocarvalho/Powershell-Scripts.git
-cd Powershell-Scripts
+git clone https://github.com/cirinocarvalho/OpenDataSync.git
+cd OpenDataSync
 Import-Module ./src/OpenDataSync/OpenDataSync.psd1
 
 # Dry run against the live USGS open data feed. No database and no secrets needed.

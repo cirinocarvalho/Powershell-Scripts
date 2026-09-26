@@ -78,7 +78,7 @@ function Get-OpenDataRecord {
         $requestUri = $Uri + $separator + ($pairs -join '&')
     }
 
-    $requestHeader = @{ 'User-Agent' = 'OpenDataSync/1.0 (+https://github.com/cirinocarvalho/Powershell-Scripts)' }
+    $requestHeader = @{ 'User-Agent' = 'OpenDataSync/1.0 (+https://github.com/cirinocarvalho/OpenDataSync)' }
     if ($Header) {
         foreach ($key in $Header.Keys) {
             $requestHeader[$key] = $Header[$key]

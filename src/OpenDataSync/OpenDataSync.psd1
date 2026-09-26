@@ -22,8 +22,8 @@
     PrivateData           = @{
         PSData = @{
             Tags       = @('automation', 'etl', 'opendata', 'sql', 'crossplatform')
-            LicenseUri = 'https://github.com/cirinocarvalho/Powershell-Scripts/blob/master/LICENSE'
-            ProjectUri = 'https://github.com/cirinocarvalho/Powershell-Scripts'
+            LicenseUri = 'https://github.com/cirinocarvalho/OpenDataSync/blob/master/LICENSE'
+            ProjectUri = 'https://github.com/cirinocarvalho/OpenDataSync'
         }
     }
 }
