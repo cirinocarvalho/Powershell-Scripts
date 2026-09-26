@@ -1,43 +1,149 @@
 # Powershell-Scripts
 
+[![CI](https://github.com/cirinocarvalho/Powershell-Scripts/actions/workflows/ci.yml/badge.svg)](https://github.com/cirinocarvalho/Powershell-Scripts/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B-5391FE?logo=powershell&logoColor=white)](https://docs.microsoft.com/powershell/)
-[![Platform](https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white)](https://www.microsoft.com/windows)
+[![PowerShell](https://img.shields.io/badge/PowerShell-7.2%2B-5391FE?logo=powershell&logoColor=white)](https://learn.microsoft.com/powershell/)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-success)](#requirements)
 
-A collection of PowerShell scripts for automating everyday Windows tasks, from
-document conversion to REST API data ingestion.
+A small, production shaped **workflow automation** showcase: `OpenDataSync` is a PowerShell 7
+module that pulls records from a public open data API and loads them into SQL Server, with the
+things an unattended job actually needs — secrets outside the script, retries, transactions,
+real error handling, and tests that run on every push.
 
-## Scripts
+## Why this exists
 
-| Script | Description |
-| --- | --- |
-| [`src/Windows Task/PDF2TIFF.ps1`](src/Windows%20Task/PDF2TIFF.ps1) | Converts PDF files to a single multi-page TIFF using Ghostscript, then archives the processed PDFs. |
-| [`src/API/BIGBELLY_CLEAN_ASSETS.ps1`](src/API/BIGBELLY_CLEAN_ASSETS.ps1) | Pulls asset data from the BigBelly REST API and inserts it into a SQL Server database, with logging. |
+The original scripts in this repository were typical one-off Windows task scripts: hardcoded
+paths, `$ErrorActionPreference = "SilentlyContinue"`, credentials in source, and no tests. They
+still work, but they are not something you can hand to a team. This project is the same kind of
+work rebuilt the way it should be shipped. The originals are preserved in
+[`legacy/`](legacy/) for comparison.
 
-## Requirements
+| | Legacy scripts | `OpenDataSync` |
+| --- | --- | --- |
+| Platform | Windows PowerShell 5.1 | PowerShell 7.2+ on Windows, macOS, Linux |
+| Secrets | Embedded in the script | Environment variables or `SecretManagement` |
+| Errors | `SilentlyContinue`, failures pass silently | Terminating errors, bounded retries, non-zero exit |
+| Writes | String concatenated SQL | Parameterized inserts inside a transaction |
+| Safety | None | `-WhatIf` dry run, identifier validation |
+| Tests | None | 64 Pester tests + PSScriptAnalyzer in CI on 3 operating systems |
 
-- Windows PowerShell 5.1 or later
-- [Ghostscript](https://www.ghostscript.com/) — required by `PDF2TIFF.ps1`
-- SQL Server access — required by `BIGBELLY_CLEAN_ASSETS.ps1`
-
-## Usage
-
-Clone the repository and run a script from a PowerShell prompt:
+## Quick start
 
 ```powershell
 git clone https://github.com/cirinocarvalho/Powershell-Scripts.git
 cd Powershell-Scripts
-.\src\API\BIGBELLY_CLEAN_ASSETS.ps1
+Import-Module ./src/OpenDataSync/OpenDataSync.psd1
+
+# Dry run against the live USGS open data feed. No database and no secrets needed.
+./examples/Sync-EarthquakeData.ps1 -WhatIf
 ```
 
-Open each script and review the variables in the **Declarations** section
-(paths, connection strings, API credentials) before running it.
-
-If execution is blocked by policy, allow local scripts for the current session:
+To load data for real, create the table and supply a connection string:
 
 ```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+# 1. Create the destination table (sql/Earthquake.sql)
+# 2. Provide the connection string as a secret, never in the script:
+$env:OPENDATASYNC_SQLCONNECTIONSTRING = 'Server=localhost;Database=OpenData;Integrated Security=True;'
+
+./examples/Sync-EarthquakeData.ps1 -MinimumMagnitude 5 -Days 7 -LogPath ./logs/earthquake.log
 ```
+
+## Commands
+
+| Command | Purpose |
+| --- | --- |
+| `Get-AutomationSecret` | Resolves a secret from an environment variable, then a `SecretManagement` vault. |
+| `Get-OpenDataRecord` | Calls a REST API with a timeout, exponential backoff retries, and optional bearer token. |
+| `Write-SqlRecord` | Loads pipeline records into a table using parameterized, batched, transactional inserts. |
+| `Invoke-OpenDataSync` | Runs the whole fetch-to-load pipeline and returns a run summary. |
+
+Every command ships comment based help: `Get-Help Invoke-OpenDataSync -Full`.
+
+### Secrets
+
+Nothing sensitive belongs in source control. `Get-AutomationSecret` checks the environment
+first, which is what CI runners and containers provide, then falls back to a vault:
+
+```powershell
+# CI or container
+$env:OPENDATASYNC_SQLCONNECTIONSTRING = '...'
+
+# Workstation
+Set-Secret -Name SqlConnectionString -Secret '...'
+```
+
+A secret named `SqlConnectionString` maps to `OPENDATASYNC_SQLCONNECTIONSTRING`. Missing secrets
+raise an actionable error that names the exact variable to set, unless you pass `-AllowMissing`.
+
+### Mapping records to columns
+
+`ColumnMap` keys are destination columns. Values are either a source property name or a script
+block receiving the record as `$_`, which keeps nested payloads readable:
+
+```powershell
+$map = @{
+    EventId      = 'id'
+    Magnitude    = { $_.properties.mag }
+    EventTimeUtc = { [DateTimeOffset]::FromUnixTimeMilliseconds([long]$_.properties.time).UtcDateTime }
+}
+
+Get-OpenDataRecord -Uri $uri -RecordPath features |
+    Write-SqlRecord -Table dbo.Earthquake -ColumnMap $map
+```
+
+Missing properties and `$null` become `DBNull`, so a sparse payload does not break the load.
+
+### Safety
+
+Table and column names are validated against a strict identifier pattern and bracket quoted;
+anything else is rejected before a connection is opened. Record values are always bound as
+command parameters, so payload content can never be executed as SQL. Each batch runs in a
+transaction and rolls back as a unit, and `-WhatIf` reports the statement and row counts
+without touching the database.
+
+## Requirements
+
+- [PowerShell 7.2+](https://learn.microsoft.com/powershell/scripting/install/installing-powershell)
+- `SqlServer` module for live database writes: `Install-Module SqlServer -Scope CurrentUser`
+  (not needed for `-WhatIf` runs or the test suite)
+- Optional: `Microsoft.PowerShell.SecretManagement` for vault backed secrets
+
+## Development
+
+```powershell
+Install-Module Pester, PSScriptAnalyzer -Scope CurrentUser
+
+./build.ps1 -Task All        # lint + test, exactly what CI runs
+./build.ps1 -Task Test
+./build.ps1 -Task Analyze
+```
+
+CI runs the same `build.ps1` on `ubuntu-latest`, `windows-latest` and `macos-latest`, and fails
+on any analyzer finding, any failing test, or code coverage below 80%. The suite needs no
+database or network: HTTP calls are mocked, the ADO.NET layer is driven through duck typed
+fakes that verify commit, rollback and disposal, and the SQL statement builder and column
+mapper are pure functions tested directly.
+
+## Repository layout
+
+```
+src/OpenDataSync/     # the module (Public/ exported, Private/ internal)
+tests/                # Pester suite
+examples/             # runnable end-to-end example
+sql/                  # destination table DDL
+legacy/               # original Windows PowerShell 5.1 scripts, kept for reference
+build.ps1             # lint + test entry point used locally and in CI
+```
+
+## Legacy scripts
+
+Preserved unchanged in [`legacy/`](legacy/):
+
+- `legacy/Windows Task/PDF2TIFF.ps1` — converts PDFs to a single multi-page TIFF via Ghostscript.
+- `legacy/API/BIGBELLY_CLEAN_ASSETS.ps1` — the original vendor specific API to SQL Server import
+  that `OpenDataSync` generalises.
+
+These are Windows only, require Windows PowerShell 5.1, and are not covered by CI.
 
 ## License
 

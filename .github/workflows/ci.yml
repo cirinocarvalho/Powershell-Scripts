@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show PowerShell version
+        shell: pwsh
+        run: $PSVersionTable | Format-List
+
+      - name: Cache PowerShell modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/powershell/Modules
+            ~/Documents/PowerShell/Modules
+          key: ${{ runner.os }}-psmodules-pester5-pssa1
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          foreach ($module in 'Pester', 'PSScriptAnalyzer') {
+              if (-not (Get-Module -ListAvailable -Name $module)) {
+                  Install-Module -Name $module -Scope CurrentUser -Force -SkipPublisherCheck
+              }
+          }
+          Get-Module -ListAvailable -Name Pester, PSScriptAnalyzer |
+              Select-Object Name, Version | Format-Table -AutoSize
+
+      - name: Lint and test
+        shell: pwsh
+        run: ./build.ps1 -Task All -CI
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.os }}
+          path: out/
+          if-no-files-found: ignore
