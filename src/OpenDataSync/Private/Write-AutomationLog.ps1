@@ -4,7 +4,7 @@ function Write-AutomationLog {
         Writes a structured, timestamped log line to the PowerShell streams and an optional file.
 
     .DESCRIPTION
-        Replaces the ad hoc Log-Write helpers used by the legacy scripts. Output goes to the
+        Replaces ad hoc Log-Write style helpers. Output goes to the
         stream that matches the severity so that callers keep full control through the standard
         preference variables, and nothing is swallowed silently.
 

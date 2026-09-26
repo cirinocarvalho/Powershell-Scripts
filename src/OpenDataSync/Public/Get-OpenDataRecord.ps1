@@ -6,7 +6,7 @@ function Get-OpenDataRecord {
     .DESCRIPTION
         Wraps Invoke-RestMethod with the behaviour an unattended job needs: an explicit timeout,
         bounded retries with exponential backoff for transient failures, and a terminating error
-        once retries are exhausted. Unlike the legacy scripts, nothing is suppressed.
+        once retries are exhausted. Nothing is suppressed.
 
         When -RecordPath is supplied the response is drilled into before records are emitted,
         which handles APIs that nest their payload (for example GeoJSON 'features').

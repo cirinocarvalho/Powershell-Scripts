@@ -12,13 +12,12 @@ real error handling, and tests that run on every push.
 
 ## Why this exists
 
-The original scripts in this repository were typical one-off Windows task scripts: hardcoded
-paths, `$ErrorActionPreference = "SilentlyContinue"`, credentials in source, and no tests. They
-still work, but they are not something you can hand to a team. This project is the same kind of
-work rebuilt the way it should be shipped. The originals are preserved in
-[`legacy/`](legacy/) for comparison.
+This repository began as a set of typical one-off Windows task scripts: hardcoded paths,
+`$ErrorActionPreference = "SilentlyContinue"`, credentials in source, and no tests. They worked,
+but they were not something you could hand to a team. This project is the same kind of work
+rebuilt the way it should be shipped.
 
-| | Legacy scripts | `OpenDataSync` |
+| | Typical one-off script | `OpenDataSync` |
 | --- | --- | --- |
 | Platform | Windows PowerShell 5.1 | PowerShell 7.2+ on Windows, macOS, Linux |
 | Secrets | Embedded in the script | Environment variables or `SecretManagement` |
@@ -131,19 +130,8 @@ src/OpenDataSync/     # the module (Public/ exported, Private/ internal)
 tests/                # Pester suite
 examples/             # runnable end-to-end example
 sql/                  # destination table DDL
-legacy/               # original Windows PowerShell 5.1 scripts, kept for reference
 build.ps1             # lint + test entry point used locally and in CI
 ```
-
-## Legacy scripts
-
-Preserved unchanged in [`legacy/`](legacy/):
-
-- `legacy/Windows Task/PDF2TIFF.ps1` — converts PDFs to a single multi-page TIFF via Ghostscript.
-- `legacy/API/BIGBELLY_CLEAN_ASSETS.ps1` — the original vendor specific API to SQL Server import
-  that `OpenDataSync` generalises.
-
-These are Windows only, require Windows PowerShell 5.1, and are not covered by CI.
 
 ## License
 
